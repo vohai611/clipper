@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 arboard = "3.2.1"
-druid = "0.8.3"
+druid = {version="0.8.3", features=["im"]}
+im = "15.1.0"
