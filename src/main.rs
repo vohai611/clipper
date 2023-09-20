@@ -1,8 +1,14 @@
 use arboard::Clipboard;
+use druid::keyboard_types::Key;
+use druid::widget::prelude::*;
+use druid::widget::Controller;
 use druid::widget::{Button, Container, Flex, Label, LensWrap, List, ViewSwitcher};
-use druid::{AppLauncher, PlatformError, Widget, WidgetExt, WindowDesc};
+use druid::{AppLauncher, PlatformError, Selector, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
 use im::{vector, Vector};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 #[derive(Clone, Data, Lens)]
 struct AppState {
@@ -19,7 +25,25 @@ fn main() -> Result<(), PlatformError> {
         items: vector!["".to_string()],
     };
 
-    AppLauncher::with_window(main_window).launch(init_state)
+    let launcher = AppLauncher::with_window(main_window);
+    let x = launcher.get_external_handle();
+
+    thread::spawn(move || call_clipboard(x));
+    launcher.launch(init_state)
+}
+
+fn call_clipboard(x: druid::ExtEventSink) {
+    loop {
+        x.add_idle_callback(|data: &mut AppState| {
+            let clipboard = Clipboard::new().unwrap().get_text().unwrap();
+            let items = &mut data.items;
+            // ignore if text already in the list
+            if !items.contains(&clipboard) {
+                items.push_back(clipboard);
+            }
+        });
+        thread::sleep(Duration::from_secs_f64(0.2));
+    }
 }
 
 fn ui_builder() -> impl Widget<AppState> {
@@ -27,18 +51,14 @@ fn ui_builder() -> impl Widget<AppState> {
     let label = Label::new("Clipboard list").padding(5.0).center();
 
     // Dynamically create a list of buttons, one for each clipboard.
-    let list = LensWrap::new(
-        List::new(|| {
-            Container::new(
-                Flex::column().with_child(
-                    Label::dynamic(|item: &String, _env: &_| format!("Item: {}", item))
-                        .expand_width()
-                        .padding(5.0),
-                ),
-            )
-        }),
-        AppState::items,
-    );
+    let list = Label::dynamic(|data: &AppState, _env: &_| {
+        let val = data
+            .items
+            .iter()
+            .fold("".to_string(), |acc, item| acc + "\n" + &item);
+        format!("Item: {}", val)
+    })
+    .expand_width();
 
     let button2 = Button::new("Store clipboard")
         .on_click(|_ctx, clip: &mut AppState, _env| {
@@ -68,4 +88,27 @@ fn ui_builder() -> impl Widget<AppState> {
             .with_child(button3)
             .with_child(list),
     )
+}
+
+struct LabelControler;
+
+const a: Selector = Selector::new("label");
+
+impl Controller<AppState, Label<AppState>> for LabelControler {
+    fn event(
+        &mut self,
+        child: &mut Label<AppState>,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut AppState,
+        env: &Env,
+    ) {
+        match event {
+            Event::Timer(token) => {
+                ctx.submit_command(a);
+                println!("heloo");
+            }
+            _ => child.event(ctx, event, data, env),
+        }
+    }
 }
