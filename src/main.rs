@@ -5,7 +5,7 @@ use druid::{Data, Lens};
 use im::{vector, Vector};
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone, Data, Lens, Debug)]
+#[derive(Clone, Data, Lens)]
 struct AppState {
     items: Arc<Mutex<Vector<String>>>,
 }
@@ -28,17 +28,12 @@ fn ui_builder() -> impl Widget<AppState> {
     let label = Label::new("Clipboard list").padding(5.0).center();
 
     // Dynamically create a list of buttons, one for each clipboard.
-    let list = Container::new(LensWrap::new(
-        List::new(|| {
-            Label::dynamic(|data, _env: &_| {
-                let item = data.items.lock().unwrap().clone();
-                let mut x = String::new();
-                item.iter().for_each(|i| x.push_str(i));
-                format!("Item: {}", x)
-            })
-        }),
-        AppState::items,
-    ));
+    let list = List::new(|| {
+        Label::dynamic(|item: &Arc<Mutex<Vector<String>>>, _env: &_| format!("Item: {}", 1))
+            .expand_width()
+            .padding(5.0)
+    })
+    .lens(AppState::items);
 
     let button2 = Button::new("Store clipboard")
         .on_click(|_ctx, clip: &mut AppState, _env| {
@@ -63,10 +58,12 @@ fn ui_builder() -> impl Widget<AppState> {
         })
         .padding(5.0);
 
-    Flex::column()
-        .with_child(label)
-        .with_child(button2)
-        .with_child(button)
-        .with_child(list)
-        .with_child(button3)
+    Container::new(
+        Flex::column()
+            .with_child(label)
+            .with_child(button2)
+            .with_child(button)
+            .with_child(button3)
+            .with_child(list),
+    )
 }
