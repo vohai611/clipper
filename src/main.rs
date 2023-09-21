@@ -4,9 +4,11 @@ use druid::keyboard_types::Key;
 use druid::widget::prelude::*;
 use druid::widget::Controller;
 use druid::widget::{Button, Container, Flex, Label, LensWrap, List, ViewSwitcher};
+use druid::ImageBuf;
 use druid::{AppLauncher, PlatformError, Selector, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
 use im::{vector, Vector};
+use image::*;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -22,6 +24,12 @@ struct AppState {
 enum Clip {
     Text(String),
     Img(String),
+}
+
+fn img_to_file(img: RgbaImage, file: &str) {
+    let path = "/tmp/".to_owned() + file + ".png";
+    let image = DynamicImage::ImageRgba8(img);
+    image.save(path).unwrap();
 }
 
 impl std::fmt::Display for Clip {
@@ -70,12 +78,19 @@ fn call_clipboard(x: druid::ExtEventSink) {
                 }
                 (Err(_), Ok(img)) => {
                     let mut hash = DefaultHasher::new();
-                    let img_hashsed = img.into_owned_bytes().into_owned().hash(&mut hash);
+                    let image: RgbaImage = ImageBuffer::from_raw(
+                        img.width.try_into().unwrap(),
+                        img.height.try_into().unwrap(),
+                        img.bytes.into_owned(),
+                    )
+                    .unwrap();
+                    image.hash(&mut hash);
                     let k = hash.finish().to_string();
-                    let new = Clip::Img(k);
+                    let new = Clip::Img(k.clone());
 
                     if !items.contains(&new) {
                         items.push_back(new);
+                        img_to_file(image, &k)
                     }
                 }
                 _ => {}
