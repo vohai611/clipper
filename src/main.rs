@@ -1,4 +1,5 @@
 use arboard::Clipboard;
+use arboard::ImageData;
 use druid::keyboard_types::Key;
 use druid::widget::prelude::*;
 use druid::widget::Controller;
@@ -6,12 +7,34 @@ use druid::widget::{Button, Container, Flex, Label, LensWrap, List, ViewSwitcher
 use druid::{AppLauncher, PlatformError, Selector, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
 use im::{vector, Vector};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::thread;
 use std::time::Duration;
 
 #[derive(Clone, Data, Lens)]
 struct AppState {
-    items: Vector<String>,
+    items: Vector<Clip>,
+}
+
+#[derive(Clone, Data, PartialEq, Debug)]
+enum Clip {
+    Text(String),
+    Img(String),
+}
+
+impl std::fmt::Display for Clip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Clip::Text(t) => {
+                write!(f, "{t}")
+            }
+            Clip::Img(t) => {
+                write!(f, "{t}")
+            }
+        }
+    }
 }
 
 fn main() -> Result<(), PlatformError> {
@@ -20,9 +43,7 @@ fn main() -> Result<(), PlatformError> {
         .title("Clipboard viewer");
     //let data = 0_u32;
 
-    let init_state = AppState {
-        items: vector!["".to_string()],
-    };
+    let init_state = AppState { items: vector![] };
 
     let launcher = AppLauncher::with_window(main_window);
     let x = launcher.get_external_handle();
@@ -34,11 +55,30 @@ fn main() -> Result<(), PlatformError> {
 fn call_clipboard(x: druid::ExtEventSink) {
     loop {
         x.add_idle_callback(|data: &mut AppState| {
-            let clipboard = Clipboard::new().unwrap().get_text().unwrap();
+            let mut clipboard = Clipboard::new().unwrap();
+            let clip_text = clipboard.get_text();
+            let clip_img = clipboard.get_image();
             let items = &mut data.items;
-            // ignore if text already in the list
-            if !items.contains(&clipboard) {
-                items.push_back(clipboard);
+
+            match (clip_text, clip_img) {
+                (Ok(stri), Err(_)) => {
+                    // ignore if text already in the list
+                    let new = Clip::Text(stri.to_owned());
+                    if !items.contains(&new) {
+                        items.push_back(new);
+                    }
+                }
+                (Err(_), Ok(img)) => {
+                    let mut hash = DefaultHasher::new();
+                    let img_hashsed = img.into_owned_bytes().into_owned().hash(&mut hash);
+                    let k = hash.finish().to_string();
+                    let new = Clip::Img(k);
+
+                    if !items.contains(&new) {
+                        items.push_back(new);
+                    }
+                }
+                _ => {}
             }
         });
         thread::sleep(Duration::from_secs_f64(0.2));
@@ -53,23 +93,15 @@ fn ui_builder() -> impl Widget<AppState> {
     let list = List::new(|| {
         Flex::row()
             .with_child(
-                Button::new("copy").on_click(|_ctx, clip: &mut String, _env| println!("{clip}")),
+                Button::new("copy").on_click(|_ctx, clip: &mut Clip, _env| println!("{clip}")),
             )
-            .with_child(Label::dynamic(|item: &String, _env: &_| {
+            .with_child(Label::dynamic(|item: &Clip, _env: &_| {
                 format!("Item: {}", item)
             }))
             .expand_width()
             .padding(5.0)
     })
     .lens(AppState::items);
-
-    let button2 = Button::new("Store clipboard")
-        .on_click(|_ctx, clip: &mut AppState, _env| {
-            let mut clipboard = Clipboard::new().unwrap();
-            println!("Clipboard: {}", clipboard.get_text().unwrap());
-            clip.items.push_back(clipboard.get_text().unwrap());
-        })
-        .padding(5.0);
 
     let button = Button::new("View")
         .on_click(|_ctx, clip: &mut AppState, _env| {
@@ -86,7 +118,6 @@ fn ui_builder() -> impl Widget<AppState> {
     Container::new(
         Flex::column()
             .with_child(label)
-            .with_child(button2)
             .with_child(button)
             .with_child(button3)
             .with_child(list),
