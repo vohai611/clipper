@@ -51,7 +51,13 @@ fn ui_builder() -> impl Widget<AppState> {
 
     // Dynamically create a list of buttons, one for each clipboard.
     let list = List::new(|| {
-        Label::dynamic(|item: &String, _env: &_| format!("Item: {}", item))
+        Flex::row()
+            .with_child(
+                Button::new("copy").on_click(|_ctx, clip: &mut String, _env| println!("{clip}")),
+            )
+            .with_child(Label::dynamic(|item: &String, _env: &_| {
+                format!("Item: {}", item)
+            }))
             .expand_width()
             .padding(5.0)
     })
