@@ -32,6 +32,16 @@ fn img_to_file(img: RgbaImage, file: &str) {
     image.save(path).unwrap();
 }
 
+fn file_to_img(file: &str) -> ImageData {
+    let path = "/tmp/".to_owned() + file + ".png";
+    let image = image::open(path).unwrap();
+    ImageData {
+        width: image.width() as usize,
+        height: image.height() as usize,
+        bytes: image.into_bytes().into(),
+    }
+}
+
 impl std::fmt::Display for Clip {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -107,9 +117,15 @@ fn ui_builder() -> impl Widget<AppState> {
     // Dynamically create a list of buttons, one for each clipboard.
     let list = List::new(|| {
         Flex::row()
-            .with_child(
-                Button::new("copy").on_click(|_ctx, clip: &mut Clip, _env| println!("{clip}")),
-            )
+            .with_child(Button::new("copy").on_click(|_ctx, data: &mut Clip, _env| {
+                println!("{data}");
+                let mut clipboard = Clipboard::new().unwrap();
+
+                let _ = match data {
+                    Clip::Text(text) => clipboard.set_text(text.clone()),
+                    Clip::Img(img) => clipboard.set_image(file_to_img(img)),
+                };
+            }))
             .with_child(Label::dynamic(|item: &Clip, _env: &_| {
                 format!("Item: {}", item)
             }))
