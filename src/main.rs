@@ -6,7 +6,6 @@ use druid::widget::{Button, Container, Flex, Label, LensWrap, List, ViewSwitcher
 use druid::{AppLauncher, PlatformError, Selector, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
 use im::{vector, Vector};
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -51,14 +50,12 @@ fn ui_builder() -> impl Widget<AppState> {
     let label = Label::new("Clipboard list").padding(5.0).center();
 
     // Dynamically create a list of buttons, one for each clipboard.
-    let list = Label::dynamic(|data: &AppState, _env: &_| {
-        let val = data
-            .items
-            .iter()
-            .fold("".to_string(), |acc, item| acc + "\n" + &item);
-        format!("Item: {}", val)
+    let list = List::new(|| {
+        Label::dynamic(|item: &String, _env: &_| format!("Item: {}", item))
+            .expand_width()
+            .padding(5.0)
     })
-    .expand_width();
+    .lens(AppState::items);
 
     let button2 = Button::new("Store clipboard")
         .on_click(|_ctx, clip: &mut AppState, _env| {
