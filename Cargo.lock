@@ -3,6 +3,17 @@
 version = 3
 
 [[package]]
+name = "abc"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "druid",
+ "im",
+ "image",
+ "tokio",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,17 +214,6 @@ dependencies = [
  "error-code",
  "str-buf",
  "winapi",
-]
-
-[[package]]
-name = "clippy"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "druid",
- "im",
- "image",
- "tokio",
 ]
 
 [[package]]
@@ -1308,6 +1308,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e381186490a3e2017a506d62b759ea8eaf4be14666b13ed53973e8ae193451b1"
 dependencies = [
+ "image",
  "kurbo",
  "unic-bidi",
 ]

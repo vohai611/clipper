@@ -1,5 +1,5 @@
 [package]
-name = "clippy"
+name = "abc"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 arboard = "3.2.1"
-druid = {version="0.8.3", features=["im"]}
+druid = {version="0.8.3", features=["im", "image"]}
 im = "15.1.0"
 image = "0.24.7"
 tokio = "1.32.0"

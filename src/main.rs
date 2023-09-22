@@ -1,6 +1,7 @@
 use arboard::Clipboard;
 use arboard::ImageData;
 use druid::keyboard_types::Key;
+use druid::piet::Image;
 use druid::widget::prelude::*;
 use druid::widget::Controller;
 use druid::widget::{Button, Container, Flex, Label, LensWrap, List, ViewSwitcher};
@@ -24,6 +25,15 @@ struct AppState {
 enum Clip {
     Text(String),
     Img(String),
+}
+
+impl Clip {
+    fn is_img(&self) -> bool {
+        match self {
+            Clip::Text(_) => false,
+            Clip::Img(_) => true,
+        }
+    }
 }
 
 fn img_to_file(img: RgbaImage, file: &str) {
@@ -129,6 +139,24 @@ fn ui_builder() -> impl Widget<AppState> {
             .with_child(Label::dynamic(|item: &Clip, _env: &_| {
                 format!("Item: {}", item)
             }))
+            .with_child(ViewSwitcher::new(
+                |data: &Clip, _env| data.is_img(),
+                |selector: &bool, data: &Clip, _env| {
+                    if *selector {
+                        Box::new(druid::widget::Image::new({
+                            match data {
+                                Clip::Text(_) => ImageBuf::empty(),
+                                Clip::Img(img) => {
+                                    let img_path = "/tmp/".to_owned() + img + ".png";
+                                    ImageBuf::from_file(img_path).unwrap()
+                                }
+                            }
+                        }))
+                    } else {
+                        Box::new(druid::widget::Image::new(ImageBuf::empty()))
+                    }
+                },
+            ))
             .expand_width()
             .padding(5.0)
     })
