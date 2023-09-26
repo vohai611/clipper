@@ -1,10 +1,11 @@
 use arboard::Clipboard;
 use arboard::ImageData;
-use druid::keyboard_types::Key;
-use druid::piet::Image;
+use chrono::offset::Utc;
+use chrono::DateTime;
 use druid::widget::prelude::*;
 use druid::widget::Controller;
-use druid::widget::{Button, Container, Flex, Label, LensWrap, List, ViewSwitcher};
+use druid::widget::{Button, Container, Flex, Label, List, ViewSwitcher};
+use druid::Color;
 use druid::ImageBuf;
 use druid::{AppLauncher, PlatformError, Selector, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
@@ -15,6 +16,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::thread;
 use std::time::Duration;
+use std::time::SystemTime;
 
 #[derive(Clone, Data, Lens)]
 struct AppState {
@@ -54,12 +56,15 @@ fn file_to_img(file: &str) -> ImageData {
 
 impl std::fmt::Display for Clip {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let now: DateTime<Utc> = SystemTime::now().into();
+        let now: String = now.format("[%H:%M] ").to_string();
         match self {
             Clip::Text(t) => {
-                write!(f, "{t}")
+                let trimmed_text = t.get(0..20).unwrap_or(t);
+                write!(f, " {now}: {trimmed_text}")
             }
-            Clip::Img(t) => {
-                write!(f, "{t}")
+            Clip::Img(_) => {
+                write!(f, "{now}:")
             }
         }
     }
@@ -126,39 +131,42 @@ fn ui_builder() -> impl Widget<AppState> {
 
     // Dynamically create a list of buttons, one for each clipboard.
     let list = List::new(|| {
-        Flex::row()
-            .with_child(Button::new("copy").on_click(|_ctx, data: &mut Clip, _env| {
-                println!("{data}");
-                let mut clipboard = Clipboard::new().unwrap();
+        druid::widget::SizedBox::new(
+            Flex::row()
+                .with_child(Button::new("copy").on_click(|_ctx, data: &mut Clip, _env| {
+                    println!("{data}");
+                    let mut clipboard = Clipboard::new().unwrap();
 
-                let _ = match data {
-                    Clip::Text(text) => clipboard.set_text(text.clone()),
-                    Clip::Img(img) => clipboard.set_image(file_to_img(img)),
-                };
-            }))
-            .with_child(Label::dynamic(|item: &Clip, _env: &_| {
-                format!("Item: {}", item)
-            }))
-            .with_child(ViewSwitcher::new(
-                |data: &Clip, _env| data.is_img(),
-                |selector: &bool, data: &Clip, _env| {
-                    if *selector {
-                        Box::new(druid::widget::Image::new({
-                            match data {
-                                Clip::Text(_) => ImageBuf::empty(),
-                                Clip::Img(img) => {
-                                    let img_path = "/tmp/".to_owned() + img + ".png";
-                                    ImageBuf::from_file(img_path).unwrap()
+                    let _ = match data {
+                        Clip::Text(text) => clipboard.set_text(text.clone()),
+                        Clip::Img(img) => clipboard.set_image(file_to_img(img)),
+                    };
+                }))
+                .with_child(Label::dynamic(|item: &Clip, _env: &_| format!("{}", item)))
+                .with_child(ViewSwitcher::new(
+                    |data: &Clip, _env| data.is_img(),
+                    |selector: &bool, data: &Clip, _env| {
+                        if *selector {
+                            Box::new(druid::widget::Image::new({
+                                match data {
+                                    Clip::Text(_) => ImageBuf::empty(),
+                                    Clip::Img(img) => {
+                                        let img_path = "/tmp/".to_owned() + img + ".png";
+                                        ImageBuf::from_file(img_path).unwrap()
+                                    }
                                 }
-                            }
-                        }))
-                    } else {
-                        Box::new(druid::widget::Image::new(ImageBuf::empty()))
-                    }
-                },
-            ))
-            .expand_width()
-            .padding(5.0)
+                            }))
+                        } else {
+                            Box::new(druid::widget::Image::new(ImageBuf::empty()))
+                        }
+                    },
+                ))
+                .expand_width()
+                .padding(5.0),
+        )
+        .width(401.0)
+        .height(40.0)
+        .border(Color::WHITE, 1.0)
     })
     .lens(AppState::items);
 
