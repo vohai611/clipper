@@ -168,6 +168,7 @@ fn ui_builder() -> impl Widget<AppState> {
         .height(40.0)
         .border(Color::WHITE, 1.0)
     })
+    .scroll()
     .lens(AppState::items);
 
     let button = Button::new("View")
@@ -189,6 +190,7 @@ fn ui_builder() -> impl Widget<AppState> {
             .with_child(button3)
             .with_child(list),
     )
+    .scroll()
 }
 
 struct LabelControler;
