@@ -7,13 +7,15 @@ use druid::widget::Controller;
 use druid::widget::{Button, Container, Flex, Label, List, ViewSwitcher};
 use druid::Color;
 use druid::ImageBuf;
-use druid::{AppLauncher, PlatformError, Selector, Widget, WidgetExt, WindowDesc};
+use druid::WindowId;
+use druid::{AppLauncher, PlatformError, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
 use im::{vector, Vector};
 use image::*;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
@@ -21,19 +23,36 @@ use std::time::SystemTime;
 #[derive(Clone, Data, Lens)]
 struct AppState {
     items: Vector<Clip>,
+    hover: Option<Arc<WindowId>>,
+}
+
+#[derive(Clone, Data, Lens, Debug)]
+struct Clip {
+    item: ClipType,
+    hover: Option<Arc<WindowId>>,
+}
+
+impl PartialEq for Clip {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.item, &other.item) {
+            (ClipType::Text(x), ClipType::Text(y)) => x == y,
+            (ClipType::Img(x), ClipType::Img(y)) => x == y,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Data, PartialEq, Debug)]
-enum Clip {
+enum ClipType {
     Text(String),
     Img(String),
 }
 
 impl Clip {
     fn is_img(&self) -> bool {
-        match self {
-            Clip::Text(_) => false,
-            Clip::Img(_) => true,
+        match self.item {
+            ClipType::Text(_) => false,
+            ClipType::Img(_) => true,
         }
     }
 }
@@ -58,12 +77,12 @@ impl std::fmt::Display for Clip {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let now: DateTime<Utc> = SystemTime::now().into();
         let now: String = now.format("[%H:%M] ").to_string();
-        match self {
-            Clip::Text(t) => {
-                let trimmed_text = t.get(0..20).unwrap_or(t);
+        match &self.item {
+            ClipType::Text(t) => {
+                let trimmed_text = t.get(0..20).unwrap_or(&t);
                 write!(f, " {now}: {trimmed_text}")
             }
-            Clip::Img(_) => {
+            ClipType::Img(_) => {
                 write!(f, "{now}:")
             }
         }
@@ -76,7 +95,10 @@ fn main() -> Result<(), PlatformError> {
         .title("Clipboard viewer");
     //let data = 0_u32;
 
-    let init_state = AppState { items: vector![] };
+    let init_state = AppState {
+        items: vector![],
+        hover: None,
+    };
 
     let launcher = AppLauncher::with_window(main_window);
     let x = launcher.get_external_handle();
@@ -96,7 +118,10 @@ fn call_clipboard(x: druid::ExtEventSink) {
             match (clip_text, clip_img) {
                 (Ok(stri), Err(_)) => {
                     // ignore if text already in the list
-                    let new = Clip::Text(stri.to_owned());
+                    let new = Clip {
+                        item: ClipType::Text(stri.to_owned()),
+                        hover: None,
+                    };
                     if !items.contains(&new) {
                         items.push_back(new);
                     }
@@ -111,7 +136,10 @@ fn call_clipboard(x: druid::ExtEventSink) {
                     .unwrap();
                     image.hash(&mut hash);
                     let k = hash.finish().to_string();
-                    let new = Clip::Img(k.clone());
+                    let new = Clip {
+                        item: ClipType::Img(k.clone()),
+                        hover: None,
+                    };
 
                     if !items.contains(&new) {
                         items.push_back(new);
@@ -137,21 +165,24 @@ fn ui_builder() -> impl Widget<AppState> {
                     println!("{data}");
                     let mut clipboard = Clipboard::new().unwrap();
 
-                    let _ = match data {
-                        Clip::Text(text) => clipboard.set_text(text.clone()),
-                        Clip::Img(img) => clipboard.set_image(file_to_img(img)),
+                    let _ = match &data.item {
+                        ClipType::Text(text) => clipboard.set_text(text.clone()),
+                        ClipType::Img(img) => clipboard.set_image(file_to_img(&img)),
                     };
                 }))
-                .with_child(Label::dynamic(|item: &Clip, _env: &_| format!("{}", item)))
+                .with_child(
+                    Label::dynamic(|item: &Clip, _env: &_| format!("{}", item))
+                        .controller(LabelController),
+                )
                 .with_child(ViewSwitcher::new(
                     |data: &Clip, _env| data.is_img(),
                     |selector: &bool, data: &Clip, _env| {
                         if *selector {
                             Box::new(druid::widget::Image::new({
-                                match data {
-                                    Clip::Text(_) => ImageBuf::empty(),
-                                    Clip::Img(img) => {
-                                        let img_path = "/tmp/".to_owned() + img + ".png";
+                                match &data.item {
+                                    ClipType::Text(_) => ImageBuf::empty(),
+                                    ClipType::Img(img) => {
+                                        let img_path = "/tmp/".to_owned() + &img + ".png";
                                         ImageBuf::from_file(img_path).unwrap()
                                     }
                                 }
@@ -193,25 +224,68 @@ fn ui_builder() -> impl Widget<AppState> {
     .scroll()
 }
 
-struct LabelControler;
+struct LabelController;
 
-const a: Selector = Selector::new("label");
-
-impl Controller<AppState, Label<AppState>> for LabelControler {
+impl Controller<Clip, Label<Clip>> for LabelController {
     fn event(
         &mut self,
-        child: &mut Label<AppState>,
+        _child: &mut Label<Clip>,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut AppState,
+        data: &mut Clip,
         env: &Env,
     ) {
         match event {
-            Event::Timer(token) => {
-                ctx.submit_command(a);
-                println!("heloo");
+            Event::MouseMove(_) => {
+                if ctx.is_hot() {
+                    if data.hover.is_none() {
+                        let id = ctx.widget_id();
+                        println!("Moving: {:?}", id);
+
+                        let id = ctx.new_sub_window(
+                            druid::WindowConfig::default().show_titlebar(false),
+                            ViewSwitcher::new(
+                                |data: &Clip, _env| data.is_img(),
+                                |selector: &bool, data: &Clip, _env| {
+                                    if *selector {
+                                        Box::new(druid::widget::Image::new({
+                                            match &data.item {
+                                                ClipType::Text(_) => ImageBuf::empty(),
+                                                ClipType::Img(img) => {
+                                                    let img_path =
+                                                        "/tmp/".to_owned() + &img + ".png";
+                                                    ImageBuf::from_file(img_path).unwrap()
+                                                }
+                                            }
+                                        }))
+                                    } else {
+                                        let value = match &data.item {
+                                            ClipType::Text(t) => t.clone(),
+                                            ClipType::Img(t) => t.clone(),
+                                        };
+                                        Box::new(Label::new(value))
+                                    }
+                                },
+                            ),
+                            data.clone(),
+                            env.clone(),
+                        );
+                        data.hover = Some(id.into());
+                    }
+                } else {
+                    let id = WindowId::from(*data.hover.clone().unwrap());
+                    ctx.submit_command(druid::commands::CLOSE_WINDOW.to(id));
+                    data.hover = None;
+                    println!("Out");
+                }
             }
-            _ => child.event(ctx, event, data, env),
+            _ => {}
         }
     }
 }
+
+// mouse move
+// out -> out : nothing
+// out -> in : hover  = true,
+// in -> in2 : last hove = false, newhove = true
+// in -> out : hover = false
