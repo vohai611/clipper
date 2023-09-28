@@ -30,6 +30,7 @@ struct AppState {
 struct Clip {
     item: ClipType,
     hover: Option<Arc<WindowId>>,
+    initilzie: String,
 }
 
 impl PartialEq for Clip {
@@ -75,15 +76,14 @@ fn file_to_img(file: &str) -> ImageData {
 
 impl std::fmt::Display for Clip {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let now: DateTime<Utc> = SystemTime::now().into();
-        let now: String = now.format("[%H:%M] ").to_string();
+        let time_stampt = &self.initilzie;
         match &self.item {
             ClipType::Text(t) => {
                 let trimmed_text = t.get(0..20).unwrap_or(&t);
-                write!(f, " {now}: {trimmed_text}")
+                write!(f, " {time_stampt}: {trimmed_text}")
             }
             ClipType::Img(_) => {
-                write!(f, "{now}:")
+                write!(f, "{time_stampt}:")
             }
         }
     }
@@ -115,12 +115,15 @@ fn call_clipboard(x: druid::ExtEventSink) {
             let clip_img = clipboard.get_image();
             let items = &mut data.items;
 
+            let now: DateTime<Utc> = SystemTime::now().into();
+            let now: String = now.format("[%H:%M] ").to_string();
             match (clip_text, clip_img) {
                 (Ok(stri), Err(_)) => {
                     // ignore if text already in the list
                     let new = Clip {
                         item: ClipType::Text(stri.to_owned()),
                         hover: None,
+                        initilzie: now,
                     };
                     if !items.contains(&new) {
                         items.push_back(new);
@@ -139,6 +142,7 @@ fn call_clipboard(x: druid::ExtEventSink) {
                     let new = Clip {
                         item: ClipType::Img(k.clone()),
                         hover: None,
+                        initilzie: now,
                     };
 
                     if !items.contains(&new) {
