@@ -7,9 +7,11 @@ use druid::widget::Controller;
 use druid::widget::{Button, Container, Flex, Label, List, ViewSwitcher};
 use druid::Color;
 use druid::ImageBuf;
+use druid::Point;
 use druid::WindowId;
 use druid::{AppLauncher, PlatformError, Widget, WidgetExt, WindowDesc};
 use druid::{Data, Lens};
+use druid_shell::WindowLevel;
 use im::{vector, Vector};
 use image::*;
 use std::collections::hash_map::DefaultHasher;
@@ -230,6 +232,7 @@ fn ui_builder() -> impl Widget<AppState> {
 
 struct LabelController;
 
+/// This controler create/remove tooltip for each label
 impl Controller<Clip, Label<Clip>> for LabelController {
     fn event(
         &mut self,
@@ -240,14 +243,20 @@ impl Controller<Clip, Label<Clip>> for LabelController {
         env: &Env,
     ) {
         match event {
-            Event::MouseMove(_) => {
+            Event::MouseMove(mouse) => {
                 if ctx.is_hot() {
                     if data.hover.is_none() {
                         let id = ctx.widget_id();
-                        println!("Moving: {:?}", id);
+                        println!("Moving to: {:?}", id);
+                        dbg!(mouse);
+                        let druid::Point { x: p_x, y: p_y } = ctx.to_screen(mouse.pos);
+                        let current_screen_pos = Point::new(p_x + 1.0, p_y + 1.0);
 
                         let id = ctx.new_sub_window(
-                            druid::WindowConfig::default().show_titlebar(false),
+                            druid::WindowConfig::default()
+                                .set_position(current_screen_pos)
+                                .set_level(WindowLevel::Tooltip(ctx.window().clone()))
+                                .show_titlebar(false),
                             ViewSwitcher::new(
                                 |data: &Clip, _env| data.is_img(),
                                 |selector: &bool, data: &Clip, _env| {

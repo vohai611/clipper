@@ -9,6 +9,7 @@ dependencies = [
  "arboard",
  "chrono",
  "druid",
+ "druid-shell",
  "im",
  "image",
  "tokio",
