@@ -250,7 +250,7 @@ impl Controller<Clip, Label<Clip>> for LabelController {
                         println!("Moving to: {:?}", id);
                         dbg!(mouse);
                         let druid::Point { x: p_x, y: p_y } = ctx.to_screen(mouse.pos);
-                        let current_screen_pos = Point::new(p_x + 1.0, p_y + 1.0);
+                        let current_screen_pos = Point::new(p_x + 20.0, p_y + 20.0);
 
                         let id = ctx.new_sub_window(
                             druid::WindowConfig::default()
