@@ -3,19 +3,6 @@
 version = 3
 
 [[package]]
-name = "abc"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "chrono",
- "druid",
- "druid-shell",
- "im",
- "image",
- "tokio",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -245,6 +232,19 @@ dependencies = [
  "error-code",
  "str-buf",
  "winapi",
+]
+
+[[package]]
+name = "clipper"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "chrono",
+ "druid",
+ "druid-shell",
+ "im",
+ "image",
+ "tokio",
 ]
 
 [[package]]
